@@ -52,6 +52,11 @@ edge:
 
 # --- DVC (Cloudflare R2) ---
 
+# One-time per machine: write the R2 endpoint (from Doppler) into gitignored .dvc/config.local.
+[group('dvc')]
+dvc-setup:
+    {{dop}} sh -c 'uvx dvc remote modify --local r2 endpointurl "$R2_ENDPOINT_URL"'
+
 # Pull data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 pull:

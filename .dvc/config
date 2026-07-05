@@ -1,0 +1,5 @@
+[core]
+    remote = r2
+['remote "r2"']
+    url = s3://qsd/v1
+    region = auto

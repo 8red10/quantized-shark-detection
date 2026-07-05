@@ -94,16 +94,17 @@ uv sync --inexact && dvc pull && uv run edge
 ```
 </details>
 
-Configure the DVC remote once (per your Cloudflare R2 bucket). Only the non-secret
-endpoint/bucket is committed to `.dvc/config`; the credentials are supplied at runtime by
-Doppler (see **Secrets** below), never stored:
+The DVC remote `r2` (`s3://qsd/v1`, `region = auto`) is committed to `.dvc/config`. The
+account-specific **endpoint** and the **credentials** are kept out of git — both come from
+Doppler. Once per machine, populate the endpoint into the gitignored `.dvc/config.local`:
 
 ```bash
-dvc remote add -d r2 s3://<bucket>/<path>
-dvc remote modify r2 endpointurl https://<account>.r2.cloudflarestorage.com
-dvc remote modify r2 region auto
-# creds read from env at runtime: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (R2 token)
+just dvc-setup   # writes R2_ENDPOINT_URL (from Doppler) into .dvc/config.local
 ```
+
+After that, `just pull` / `just push` work: DVC merges `config` + `config.local` for the
+endpoint and reads `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` from the Doppler-injected
+environment (`region = auto` is committed; nothing secret is stored in git).
 
 # Secrets
 
