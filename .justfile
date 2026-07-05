@@ -60,12 +60,12 @@ dvc-setup:
 # Pull data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 pull:
-    {{dop}} uvx dvc pull
+    {{dop}} uvx --with dvc-s3 dvc pull
 
 # Push data/model artifacts to the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 push:
-    {{dop}} uvx dvc push
+    {{dop}} uvx --with dvc-s3 dvc push
 
 # Show DVC artifact status.
 [group('dvc')]
