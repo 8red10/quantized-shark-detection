@@ -1,7 +1,7 @@
 [project]
 name = "qsd-common"
 version = "0.1.0"
-description = "Shared library for the Quantized Shark Detection experiment (config, io, utils, onnx helpers)."
+description = "Shared library for the Quantized Shark Detection experiment (config, io, utils, onnx + Telegram notify helpers)."
 authors = [
     { email = "22091223+8red10@users.noreply.github.com" }
 ]
@@ -10,7 +10,11 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2",
     "pyyaml>=6",
+    "httpx>=0.27",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8"]
 
 # Optional ONNX tooling, pulled in only by the training stages via
 # `qsd-common[onnx]`. Keeps edge/data_prep installs lightweight.

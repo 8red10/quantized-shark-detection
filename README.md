@@ -114,7 +114,8 @@ inject them by prefixing secret-touching commands with `doppler run --` (the ove
 Bypass Doppler on a machine that isn't using it with `just dop='' <recipe>`.
 
 Secrets are scoped per stage (least privilege) in one Doppler project `qsd`: a root config
-`prd` holds the shared R2 credentials; a `prd_training` branch config adds
+`prd` holds the shared R2 credentials plus the Telegram bot secrets (`TELEGRAM_BOT_TOKEN`,
+`TELEGRAM_CHAT_ID`) so any stage can send notifications; a `prd_training` branch config adds
 `ROBOFLOW_API_KEY` and `HF_TOKEN`. Each machine authenticates once:
 
 | Machine | Install Doppler | Auth |
@@ -126,3 +127,24 @@ Secrets are scoped per stage (least privilege) in one Doppler project `qsd`: a r
 The headless machines use read-only **service tokens** (they can't run interactive
 `doppler login`); store the token via the machine's own env mechanism, never in the repo.
 Run `just secrets` to see which keys Doppler will inject (values masked).
+
+# Notifications
+
+`qsd-common` provides Telegram helpers (`qsd_common.notify`) so any stage can push alerts —
+primarily to signal when an unattended cloud-GPU training run finishes. Credentials come
+from Doppler (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`); sends are **best-effort** (failures
+are logged, never raised, and time out), so a completed run is never killed by a notify
+error. The API exposes `send_message` (auto-chunked), `send_photo` (plots), `send_document`
+(reports/files), and a `notify_on_completion` context manager that alerts on success/failure:
+
+```python
+from qsd_common import notify_on_completion
+
+with notify_on_completion("train-ultralytics") as tg:  # ✅/❌ alert on exit
+    metrics = train(...)
+    tg.send_photo("runs/pr_curve.png", caption="PR curve")
+    tg.send_document("runs/results.csv", caption=f"mAP={metrics['map']:.3f}")
+```
+
+Because secrets come from Doppler, run training under it: `just train ultralytics` (which
+wraps the run in `doppler run --`) delivers the alert automatically.
