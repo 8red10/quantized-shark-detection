@@ -63,7 +63,7 @@ qsd/
 # Setup
 
 Each machine clones the whole repo but only sets up its own stage. Common tasks are
-wrapped in a root [`justfile`](justfile) — run `just` from the repo root to list them
+wrapped in a root [`justfile`](.justfile) — run `just` from the repo root to list them
 (`just`, like `dvc`, must run from the repo root). Each recipe handles
 `uv sync → dvc pull → uv run` for its stage.
 
@@ -94,10 +94,35 @@ uv sync --inexact && dvc pull && uv run edge
 ```
 </details>
 
-Configure the DVC remote once (per your Cloudflare R2 bucket):
+Configure the DVC remote once (per your Cloudflare R2 bucket). Only the non-secret
+endpoint/bucket is committed to `.dvc/config`; the credentials are supplied at runtime by
+Doppler (see **Secrets** below), never stored:
 
 ```bash
 dvc remote add -d r2 s3://<bucket>/<path>
 dvc remote modify r2 endpointurl https://<account>.r2.cloudflarestorage.com
-# credentials via env: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (R2 tokens)
+dvc remote modify r2 region auto
+# creds read from env at runtime: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (R2 token)
 ```
+
+# Secrets
+
+Secrets (R2 credentials, Roboflow / HuggingFace tokens) are managed centrally with
+[Doppler](https://docs.doppler.com/) — nothing sensitive lives in git. The `just` recipes
+inject them by prefixing secret-touching commands with `doppler run --` (the overridable
+`dop` variable), so `dvc pull`/`push` and the stage runs get their env vars automatically.
+Bypass Doppler on a machine that isn't using it with `just dop='' <recipe>`.
+
+Secrets are scoped per stage (least privilege) in one Doppler project `qsd`: a root config
+`prd` holds the shared R2 credentials; a `prd_training` branch config adds
+`ROBOFLOW_API_KEY` and `HF_TOKEN`. Each machine authenticates once:
+
+| Machine | Install Doppler | Auth |
+|---|---|---|
+| Mac (data prep) | `brew install dopplerhq/cli/doppler` | `doppler login && doppler setup -p qsd -c prd_data` |
+| Cloud GPU (training) | `curl -Ls https://cli.doppler.com/install.sh \| sh` | `export DOPPLER_TOKEN=<prd_training service token>` |
+| Jetson (edge) | Doppler install script (arm64) | `export DOPPLER_TOKEN=<prd_edge service token>` |
+
+The headless machines use read-only **service tokens** (they can't run interactive
+`doppler login`); store the token via the machine's own env mechanism, never in the repo.
+Run `just secrets` to see which keys Doppler will inject (values masked).

@@ -4,6 +4,10 @@
 
 train_frameworks := "ultralytics roboflow hf"
 
+# Prefix that injects secrets from Doppler as env vars (R2/DVC, Roboflow, HF, ...).
+# Override to bypass Doppler on a machine not using it: `just dop='' <recipe>`.
+dop := "doppler run --"
+
 # List all recipes.
 default:
     @just --list
@@ -14,8 +18,8 @@ default:
 [group('stages')]
 data-prep:
     uv sync --directory packages/data_prep
-    just pull
-    uv run --directory packages/data_prep data-prep
+    just dop="{{dop}}" pull
+    {{dop}} uv run --directory packages/data_prep data-prep
 
 # --- Stage 2: training (cloud GPU) ---
 
@@ -29,8 +33,8 @@ train framework:
         *) echo "unknown framework '{{framework}}' (use: {{train_frameworks}})"; exit 1 ;;
     esac
     uv sync --directory packages/training/{{framework}}
-    just pull
-    uv run --directory packages/training/{{framework}} train-{{framework}}
+    just dop="{{dop}}" pull
+    {{dop}} uv run --directory packages/training/{{framework}} train-{{framework}}
 
 # --- Stage 3: edge (Jetson Orin Nano) ---
 
@@ -43,25 +47,32 @@ edge-setup:
 [group('stages')]
 edge:
     uv sync --inexact --directory packages/edge
-    just pull
-    uv run --directory packages/edge edge
+    just dop="{{dop}}" pull
+    {{dop}} uv run --directory packages/edge edge
 
 # --- DVC (Cloudflare R2) ---
 
-# Pull data/model artifacts from the R2 remote.
+# Pull data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 pull:
-    uvx dvc pull
+    {{dop}} uvx dvc pull
 
-# Push data/model artifacts to the R2 remote.
+# Push data/model artifacts to the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 push:
-    uvx dvc push
+    {{dop}} uvx dvc push
 
 # Show DVC artifact status.
 [group('dvc')]
 dvc-status:
     uvx dvc status
+
+# --- Secrets (Doppler) ---
+
+# Show which secrets Doppler will inject into recipes (values masked).
+[group('secrets')]
+secrets:
+    doppler secrets
 
 # --- Cross-stage dev tasks ---
 

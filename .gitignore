@@ -19,6 +19,11 @@ packages/*/*/.venv/
 !/models/.gitkeep
 !/manifests/
 
+# Secrets — never commit. Secrets are supplied at runtime by Doppler.
+.env
+.env.*
+.doppler/
+
 # OS / editor
 .DS_Store
 .idea/
