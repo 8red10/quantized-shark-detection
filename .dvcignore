@@ -1,3 +1,9 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+
+# macOS Finder artifacts. These are created/rewritten out of band (not by our
+# deterministic data-prep pipeline), so hashing them into DVC directory outputs makes
+# rebuilds spuriously "changed". Exclude them so tracked dir hashes stay reproducible.
+.DS_Store
+**/.DS_Store

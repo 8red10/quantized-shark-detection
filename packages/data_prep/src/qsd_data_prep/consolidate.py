@@ -181,6 +181,12 @@ def consolidate(
             )
             ann_id += 1
 
+    # Finder can drop a fresh .DS_Store into raw_root/images_out while we work; it is also
+    # excluded via .dvcignore, but prune it here so the on-disk tree matches the deterministic
+    # file set exactly (self-healing guard — keeps a --force rebuild byte-identical and DVC-safe).
+    for junk in raw_root.rglob(".DS_Store"):
+        junk.unlink(missing_ok=True)
+
     _verify(
         images,
         annotations,
