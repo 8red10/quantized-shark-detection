@@ -115,3 +115,8 @@ test:
 # Lint + test.
 [group('dev')]
 check: lint test
+
+# Send a test message with telegram
+[group('dev')]
+tg-send:
+    {{dop}} uv run --directory packages/common python -c "from qsd_common import send_message; print(send_message('QSD test ✅'))"
