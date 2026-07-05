@@ -62,23 +62,37 @@ qsd/
 
 # Setup
 
-Each machine clones the whole repo but only sets up its own stage:
+Each machine clones the whole repo but only sets up its own stage. Common tasks are
+wrapped in a root [`justfile`](justfile) — run `just` from the repo root to list them
+(`just`, like `dvc`, must run from the repo root). Each recipe handles
+`uv sync → dvc pull → uv run` for its stage.
+
+```bash
+uv tool install rust-just     # provides `just` on the cloud GPU / Jetson (aarch64)
+just --list                   # discover recipes
+
+just data-prep                # Stage 1 — local CPU
+just train ultralytics        # Stage 2 — cloud GPU (or: roboflow | hf)
+just edge-setup && just edge  # Stage 3 — Jetson: bootstrap venv once, then run
+```
+
+The Jetson's `edge-setup` recipe creates the venv with `--system-site-packages` so it can
+see JetPack's TensorRT/torch; the `edge` recipe then syncs with `--inexact` (keeping those
+system packages) and runs. Cross-stage dev tasks are also available: `just lint`,
+`just fmt`, `just lock` (re-lock every stage), `just test`, `just check`.
+
+<details><summary>Raw commands (no <code>just</code>)</summary>
 
 ```bash
 # Stage 1 — local CPU
-cd packages/data_prep       && uv sync && dvc pull && uv run data-prep
-
+cd packages/data_prep && uv sync && dvc pull && uv run data-prep
 # Stage 2 — cloud GPU (pick the framework)
-cd packages/training/ultralytics && uv sync && dvc pull && uv run train-ultralytics
-cd packages/training/roboflow    && uv sync && dvc pull && uv run train-roboflow
-cd packages/training/hf          && uv sync && dvc pull && uv run train-hf
-
+cd packages/training/<ultralytics|roboflow|hf> && uv sync && dvc pull && uv run train-<framework>
 # Stage 3 — Jetson Orin Nano (venv sees JetPack's TensorRT/torch)
-cd packages/edge
-uv venv --system-site-packages --python /usr/bin/python3
-uv sync --inexact           # --inexact: keep the system-provided packages
-dvc pull && uv run edge
+cd packages/edge && uv venv --system-site-packages --python /usr/bin/python3
+uv sync --inexact && dvc pull && uv run edge
 ```
+</details>
 
 Configure the DVC remote once (per your Cloudflare R2 bucket):
 
