@@ -11,14 +11,6 @@ dist/
 packages/*/.venv/
 packages/*/*/.venv/
 
-# DVC-managed artifacts (contents pulled from Cloudflare R2; only .dvc
-# pointers + small manifests are tracked in git)
-/data/*
-!/data/.gitkeep
-/models/*
-!/models/.gitkeep
-!/manifests/
-
 # Secrets — never commit. Secrets are supplied at runtime by Doppler.
 .env
 .env.*

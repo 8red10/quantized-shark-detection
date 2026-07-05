@@ -57,15 +57,25 @@ edge:
 dvc-setup:
     {{dop}} sh -c 'uvx dvc remote modify --local r2 endpointurl "$R2_ENDPOINT_URL"'
 
-# Pull data/model artifacts from the R2 remote (R2 creds injected by Doppler).
+# Pull all data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
-pull:
-    {{dop}} uvx dvc pull
+pull-all:
+    {{dop}} uvx --with dvc-s3 dvc pull
+
+# Pull all data from the R2 remote.
+[group('dvc')]
+pull-data:
+    {{dop}} uvx --with dvc-s3 dvc pull data
+
+# Pull raw dataset from the R2 remote.
+[group('dvc')]
+pull-raw:
+    {{dop}} uvx --with dvc-s3 dvc pull data/raw
 
 # Push data/model artifacts to the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 push:
-    {{dop}} uvx dvc push
+    {{dop}} uvx --with dvc-s3 dvc push
 
 # Show DVC artifact status.
 [group('dvc')]
