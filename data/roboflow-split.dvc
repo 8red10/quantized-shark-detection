@@ -3,4 +3,4 @@ outs:
   size: 2371937169
   nfiles: 4661
   hash: md5
-  path: raw
+  path: roboflow-split
