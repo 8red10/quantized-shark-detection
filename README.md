@@ -8,6 +8,30 @@ Creates the train/val/test splits while ensuring near-duplicate images are kept 
 
 Hardware = local CPU
 
+<details><summary>How <code>data/raw</code> was built from the Roboflow export</summary>
+
+The source is a Roboflow COCO export (*SharkSpotting v3*) whose `train/valid/test` splits
+were made **without** near-duplicate grouping, so those splits are discarded — we re-split
+later (above) with near-dup awareness. `just consolidate-raw` turns the export
+(`data/roboflow-split/`) into a single split-free pool at `data/raw/`:
+
+- **Merges** all three splits into `data/raw/images/` + `data/raw/annotations.coco.json` —
+  **4656 images / 8857 annotations**.
+- **Renames** images to `sharkspotting_000001.jpg … sharkspotting_004656.jpg`, stripping
+  Roboflow's `.rf.<hash>` suffixes.
+- **Cleans the taxonomy** to a contiguous 0-indexed 4-class set — `0 boat, 1 dolphin,
+  2 person, 3 shark` — dropping Roboflow's unused dummy `id 0` supercategory.
+- **Re-indexes** image and annotation IDs globally (each Roboflow split restarts them) and
+  keeps provenance per image in `extra` (`name`, `roboflow_file`, `source_split`). Roboflow
+  cruft (per-split `info`/`licenses`, READMEs) is stripped; CC BY 4.0 + the source URL are
+  retained in `info`.
+
+This is a **one-time** step, but it is also idempotent for reproducibility. After 
+verifying, publish the pool with `dvc add data/raw && just push`; from then on 
+`just pull-raw` fetches it and re-running the consolidation is unnecessary. 
+
+</details>
+
 ## 2. Training
 Trains each model using frameworks and pipelines tuned to that model architecture. After training, exports each model to ONNX for compatibility with quantization. 
 
