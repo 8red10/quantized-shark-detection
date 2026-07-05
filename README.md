@@ -13,7 +13,7 @@ Hardware = local CPU
 The source is a Roboflow COCO export (*SharkSpotting v3*) whose `train/valid/test` splits
 were made **without** near-duplicate grouping, so those splits are discarded — we re-split
 later (above) with near-dup awareness. `just consolidate-raw` turns the export
-(`data/roboflow-split/`) into a single split-free pool at `data/raw/`:
+(`data/roboflow-export/`) into a single split-free pool at `data/raw/`:
 
 - **Merges** all three splits into `data/raw/images/` + `data/raw/annotations.coco.json` —
   **4656 images / 8857 annotations**.
@@ -26,9 +26,9 @@ later (above) with near-dup awareness. `just consolidate-raw` turns the export
   cruft (per-split `info`/`licenses`, READMEs) is stripped; CC BY 4.0 + the source URL are
   retained in `info`.
 
-This is a **one-time** step, but it is also idempotent for reproducibility. After 
-verifying, publish the pool with `dvc add data/raw && just push`; from then on 
-`just pull-raw` fetches it and re-running the consolidation is unnecessary. 
+This is a **one-time** step, but it is also idempotent for reproducibility. After
+verifying, publish the pool with `dvc add data/raw && just push`; from then on
+`just pull-raw` fetches it and re-running the consolidation is unnecessary.
 
 </details>
 

@@ -1,4 +1,4 @@
-"""Tests for qsd_data_prep.consolidate — hermetic, on a synthetic roboflow-split fixture.
+"""Tests for qsd_data_prep.consolidate — hermetic, on a synthetic roboflow-export fixture.
 
 Never touches the real 2.4 GB dataset: a tiny fake export is built in ``tmp_path`` and
 ``data_dir`` is monkeypatched, so the whole suite runs in-memory-fast. The headline test is
@@ -147,7 +147,8 @@ def test_filenames_are_sequential_zero_padded(fake_data_dir: Path) -> None:
 def test_ids_reindexed_globally_and_contiguous(fake_data_dir: Path) -> None:
     doc = _run(fake_data_dir)
     assert [im["id"] for im in doc["images"]] == [0, 1, 2, 3]
-    assert [a["id"] for a in doc["annotations"]] == [1, 2, 3, 4, 5, 6]  # 1-based, no per-split restart
+    # annotation ids are 1-based and globally contiguous (no per-split restart)
+    assert [a["id"] for a in doc["annotations"]] == [1, 2, 3, 4, 5, 6]
     valid_ids = {im["id"] for im in doc["images"]}
     assert all(a["image_id"] in valid_ids for a in doc["annotations"])
 

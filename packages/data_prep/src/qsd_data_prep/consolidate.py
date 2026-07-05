@@ -1,6 +1,6 @@
 """Consolidate the Roboflow COCO export into a single split-free ``data/raw`` pool.
 
-The Roboflow export (``data/roboflow-split/{train,valid,test}/``) was split without
+The Roboflow export (``data/roboflow-export/{train,valid,test}/``) was split without
 near-duplicate grouping in mind, so the splits are discarded here. This step merges all
 three into one flat image directory plus one consolidated COCO annotations file, ready
 for the near-dup-aware splitting that the data-prep stage performs later.
@@ -32,7 +32,7 @@ from qsd_common import data_dir, get_logger
 
 log = get_logger(__name__)
 
-SOURCE_DIR = "roboflow-split"
+SOURCE_DIR = "roboflow-export"
 SPLITS = ("train", "valid", "test")
 FILENAME_STEM = "sharkspotting"
 PAD_WIDTH = 6

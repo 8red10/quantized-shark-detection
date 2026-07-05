@@ -21,7 +21,7 @@ data-prep:
     just dop="{{dop}}" pull
     {{dop}} uv run --directory packages/data_prep data-prep
 
-# One-time: rebuild data/raw from the Roboflow export (data/roboflow-split).
+# One-time: rebuild data/raw from the Roboflow export (data/roboflow-export).
 [group('stage 1: data prep')]
 consolidate-raw *args:
     uv sync --directory packages/data_prep
@@ -72,7 +72,7 @@ pull:
 # Pull roboflow download from the R2 remote.
 [group('dvc')]
 pull-rf:
-    {{dop}} uvx --with dvc-s3 dvc pull data/roboflow-split
+    {{dop}} uvx --with dvc-s3 dvc pull data/roboflow-export
 
 # Pull raw dataset from the R2 remote.
 [group('dvc')]
