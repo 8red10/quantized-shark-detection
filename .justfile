@@ -15,16 +15,23 @@ default:
 # --- Stage 1: data prep (local CPU) ---
 
 # Sync, pull data, and run the data-prep stage.
-[group('stages')]
+[group('stage 1: data prep')]
 data-prep:
     uv sync --directory packages/data_prep
     just dop="{{dop}}" pull
     {{dop}} uv run --directory packages/data_prep data-prep
 
+# One-time: rebuild data/raw from the Roboflow export (data/roboflow-export).
+[group('stage 1: data prep')]
+consolidate-raw *args:
+    uv sync --directory packages/data_prep
+    just dop="{{dop}}" pull-rf
+    uv run --directory packages/data_prep consolidate-raw {{args}}
+
 # --- Stage 2: training (cloud GPU) ---
 
 # Sync, pull data, and train one framework: `just train ultralytics|roboflow|hf`.
-[group('stages')]
+[group('stage 2: training')]
 train framework:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -39,12 +46,12 @@ train framework:
 # --- Stage 3: edge (Jetson Orin Nano) ---
 
 # One-time (Jetson): create a venv that can see JetPack's TensorRT/torch.
-[group('stages')]
+[group('stage 3: edge')]
 edge-setup:
     uv venv --directory packages/edge --system-site-packages --python /usr/bin/python3
 
 # Sync (keeping system packages), pull data, and run the edge stage.
-[group('stages')]
+[group('stage 3: edge')]
 edge:
     uv sync --inexact --directory packages/edge
     just dop="{{dop}}" pull
@@ -59,13 +66,13 @@ dvc-setup:
 
 # Pull all data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
-pull-all:
+pull:
     {{dop}} uvx --with dvc-s3 dvc pull
 
-# Pull all data from the R2 remote.
+# Pull roboflow download from the R2 remote.
 [group('dvc')]
-pull-data:
-    {{dop}} uvx --with dvc-s3 dvc pull data
+pull-rf:
+    {{dop}} uvx --with dvc-s3 dvc pull data/roboflow-export
 
 # Pull raw dataset from the R2 remote.
 [group('dvc')]
@@ -126,7 +133,7 @@ test:
 [group('dev')]
 check: lint test
 
-# Send a test message with telegram
+# Send a test message with telegram.
 [group('dev')]
 tg-send:
     {{dop}} uv run --directory packages/common python -c "from qsd_common import send_message; print(send_message('QSD test ✅'))"

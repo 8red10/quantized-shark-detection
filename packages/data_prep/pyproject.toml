@@ -15,8 +15,12 @@ dependencies = [
     "tqdm>=4.66",
 ]
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [project.scripts]
 data-prep = "qsd_data_prep:main"
+consolidate-raw = "qsd_data_prep.consolidate:main"
 
 # Editable path dependency on the shared library (no workspace / no shared lock).
 [tool.uv.sources]
