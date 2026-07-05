@@ -1,0 +1,23 @@
+# Repo-root config ONLY — shared dev-tool settings for every package.
+#
+# This is intentionally NOT a Python project and NOT a uv workspace:
+#   - no [project] table  -> uv will not treat the repo root as a package
+#   - no [tool.uv.workspace] -> the stages under packages/ stay INDEPENDENT
+#     projects, each with its own pyproject.toml + uv.lock + .venv.
+#
+# See README / plan: the three experiment stages run on different machines
+# (local CPU, cloud GPU, Jetson) with incompatible dependency stacks, so a
+# single shared lockfile is deliberately avoided. Stages share code via an
+# editable path dependency on packages/common instead.
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["packages/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["packages"]

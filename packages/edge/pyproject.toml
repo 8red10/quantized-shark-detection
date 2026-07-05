@@ -1,0 +1,35 @@
+[project]
+name = "qsd-edge"
+version = "0.1.0"
+description = "Stage 3: quantize (INT8) and benchmark models on the Jetson Orin Nano — accuracy, latency, power."
+authors = [
+    { email = "22091223+8red10@users.noreply.github.com" }
+]
+# Jetson JetPack ships Python 3.10.
+requires-python = ">=3.10"
+
+# GLUE DEPENDENCIES ONLY. These are pip-installable everywhere.
+#
+# The heavy edge runtime — TensorRT, the Jetson CUDA torch build, pycuda —
+# is provided by JetPack (system site-packages) and is intentionally NOT
+# listed here, because those wheels are not resolvable off-device. On the
+# Jetson, create the venv with access to them:
+#
+#     uv venv --system-site-packages --python /usr/bin/python3
+#     uv sync --inexact          # --inexact: don't remove system packages
+#
+dependencies = [
+    "qsd-common",
+    "numpy>=1.26",
+    "pillow>=10",
+]
+
+[project.scripts]
+edge = "qsd_edge:main"
+
+[tool.uv.sources]
+qsd-common = { path = "../common", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"

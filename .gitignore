@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# uv / virtualenvs (per-stage; recreated via `uv sync`)
+.venv/
+packages/*/.venv/
+packages/*/*/.venv/
+
+# DVC-managed artifacts (contents pulled from Cloudflare R2; only .dvc
+# pointers + small manifests are tracked in git)
+/data/*
+!/data/.gitkeep
+/models/*
+!/models/.gitkeep
+!/manifests/
+
+# Secrets — never commit. Secrets are supplied at runtime by Doppler.
+.env
+.env.*
+.doppler/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Notes
+SCRATCH.md
