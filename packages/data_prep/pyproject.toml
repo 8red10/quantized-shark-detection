@@ -1,0 +1,27 @@
+[project]
+name = "qsd-data-prep"
+version = "0.1.0"
+description = "Stage 1: build train/val/test splits (near-dup aware) and the INT8 calibration set. Runs on local CPU."
+authors = [
+    { email = "22091223+8red10@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "qsd-common",
+    "numpy>=1.26",
+    "pillow>=10",
+    "imagehash>=4.3",
+    "scikit-learn>=1.4",
+    "tqdm>=4.66",
+]
+
+[project.scripts]
+data-prep = "qsd_data_prep:main"
+
+# Editable path dependency on the shared library (no workspace / no shared lock).
+[tool.uv.sources]
+qsd-common = { path = "../common", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"

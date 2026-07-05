@@ -1,0 +1,22 @@
+[project]
+name = "qsd-train-ultralytics"
+version = "0.1.0"
+description = "Stage 2 (Ultralytics): train a YOLO model and export to ONNX. Runs on cloud GPU."
+authors = [
+    { email = "22091223+8red10@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "qsd-common[onnx]",
+    "ultralytics>=8.2",
+]
+
+[project.scripts]
+train-ultralytics = "qsd_train_ultralytics:main"
+
+[tool.uv.sources]
+qsd-common = { path = "../../common", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"

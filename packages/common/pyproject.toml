@@ -1,0 +1,25 @@
+[project]
+name = "qsd-common"
+version = "0.1.0"
+description = "Shared library for the Quantized Shark Detection experiment (config, io, utils, onnx helpers)."
+authors = [
+    { email = "22091223+8red10@users.noreply.github.com" }
+]
+# Kept low so every stage can consume it — the Jetson (JetPack) ships Python 3.10.
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2",
+    "pyyaml>=6",
+]
+
+# Optional ONNX tooling, pulled in only by the training stages via
+# `qsd-common[onnx]`. Keeps edge/data_prep installs lightweight.
+[project.optional-dependencies]
+onnx = [
+    "onnx>=1.16",
+    "onnxruntime>=1.18",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"

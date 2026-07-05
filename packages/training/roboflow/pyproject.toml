@@ -1,0 +1,22 @@
+[project]
+name = "qsd-train-roboflow"
+version = "0.1.0"
+description = "Stage 2 (Roboflow): train a model via the Roboflow platform and export to ONNX. Runs on cloud GPU."
+authors = [
+    { email = "22091223+8red10@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "qsd-common[onnx]",
+    "roboflow>=1.1",
+]
+
+[project.scripts]
+train-roboflow = "qsd_train_roboflow:main"
+
+[tool.uv.sources]
+qsd-common = { path = "../../common", editable = true }
+
+[build-system]
+requires = ["uv_build>=0.11.26,<0.12.0"]
+build-backend = "uv_build"
