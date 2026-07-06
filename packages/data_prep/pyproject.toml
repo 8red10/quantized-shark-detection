@@ -11,16 +11,20 @@ dependencies = [
     "numpy>=1.26",
     "pillow>=10",
     "imagehash>=4.3",
-    "scikit-learn>=1.4",
     "tqdm>=4.66",
 ]
 
 [dependency-groups]
 dev = ["pytest>=8"]
+# One-off interactive dataset exploration (heavy; not synced by default):
+#   uv sync --directory packages/data_prep --group fiftyone
+fiftyone = ["fiftyone>=1.0"]
 
 [project.scripts]
 data-prep = "qsd_data_prep:main"
 consolidate-raw = "qsd_data_prep.consolidate:main"
+explore-thresholds = "qsd_data_prep.explore:main"
+visualize = "qsd_data_prep.visualize:main"
 
 # Editable path dependency on the shared library (no workspace / no shared lock).
 [tool.uv.sources]

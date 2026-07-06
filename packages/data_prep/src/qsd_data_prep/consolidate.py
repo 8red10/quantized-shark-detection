@@ -23,12 +23,11 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import time
 from pathlib import Path
 
 from tqdm import tqdm
 
-from qsd_common import data_dir, get_logger
+from qsd_common import clear_dir, data_dir, get_logger
 
 log = get_logger(__name__)
 
@@ -71,26 +70,6 @@ def _build_category_remap(categories: list[dict]) -> tuple[dict[int, int], list[
     return old_to_new, new_categories
 
 
-def _clear_dir(path: Path, *, attempts: int = 5) -> None:
-    """Recursively remove ``path``, retrying transient races.
-
-    On macOS, Finder/Spotlight can drop a fresh ``.DS_Store`` into a directory while
-    ``shutil.rmtree`` is deleting it bottom-up, so the final ``rmdir`` fails with ENOTEMPTY even
-    though we just emptied it. A few bounded retries clear that; ``rmtree`` on the already-shrunk
-    tree is safe to repeat. This keeps ``--force`` a reliable rebuild/recovery path.
-    """
-    for attempt in range(attempts):
-        try:
-            shutil.rmtree(path)
-            return
-        except FileNotFoundError:
-            return
-        except OSError:
-            if attempt == attempts - 1:
-                raise
-            time.sleep(0.1)
-
-
 def consolidate(
     *,
     force: bool = False,
@@ -109,7 +88,7 @@ def consolidate(
                 f"rebuild is byte-identical and DVC-safe; it also recovers a partial run)."
             )
         log.info("--force given: clearing existing %s", raw_root)
-        _clear_dir(raw_root)
+        clear_dir(raw_root)
     images_out.mkdir(parents=True, exist_ok=True)
 
     images: list[dict] = []

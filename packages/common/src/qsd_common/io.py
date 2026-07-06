@@ -7,6 +7,8 @@ regardless of which package it runs from.
 
 from __future__ import annotations
 
+import shutil
+import time
 from pathlib import Path
 
 
@@ -32,3 +34,23 @@ def models_dir() -> Path:
 
 def manifests_dir() -> Path:
     return repo_root() / "manifests"
+
+
+def clear_dir(path: Path, *, attempts: int = 5) -> None:
+    """Recursively remove ``path``, retrying transient races.
+
+    On macOS, Finder/Spotlight can drop a fresh ``.DS_Store`` into a directory while
+    ``shutil.rmtree`` is deleting it bottom-up, so the final ``rmdir`` fails with ENOTEMPTY even
+    though we just emptied it. A few bounded retries clear that; ``rmtree`` on the already-shrunk
+    tree is safe to repeat. This keeps ``--force`` a reliable rebuild/recovery path.
+    """
+    for attempt in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.1)

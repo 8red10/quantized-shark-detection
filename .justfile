@@ -14,12 +14,19 @@ default:
 
 # --- Stage 1: data prep (local CPU) ---
 
-# Sync, pull data, and run the data-prep stage.
+# Sync, pull data, and run the data-prep stage (builds the manifest + data/processed).
 [group('stage 1: data prep')]
-data-prep:
+data-prep *args:
     uv sync --directory packages/data_prep
-    just dop="{{dop}}" pull
-    {{dop}} uv run --directory packages/data_prep data-prep
+    just dop="{{dop}}" pull-raw
+    uv run --directory packages/data_prep data-prep {{args}}
+
+# One-time: report grouping stats per pHash threshold (+ pair montages to eyeball).
+[group('stage 1: data prep')]
+explore-thresholds *args:
+    uv sync --directory packages/data_prep
+    just dop="{{dop}}" pull-raw
+    uv run --directory packages/data_prep explore-thresholds {{args}}
 
 # One-time: rebuild data/raw from the Roboflow export (data/roboflow-export).
 [group('stage 1: data prep')]
@@ -27,6 +34,21 @@ consolidate-raw *args:
     uv sync --directory packages/data_prep
     just dop="{{dop}}" pull-rf
     uv run --directory packages/data_prep consolidate-raw {{args}}
+
+# Open a dataset in the FiftyOne app: just visualize train|val|test|calib|raw|roboflow-{train,valid,test}.
+[group('stage 1: data prep')]
+visualize dataset="train" *args:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{dataset}}" in
+        raw)                  dvc_path=data/raw ;;
+        train|val|test|calib) dvc_path=data/processed/{{dataset}} ;;
+        roboflow-*)           dvc_path=data/roboflow-export ;;
+        *) echo "unknown dataset '{{dataset}}'"; exit 1 ;;
+    esac
+    uv sync --directory packages/data_prep --group fiftyone
+    {{dop}} dvc pull "$dvc_path"
+    uv run --directory packages/data_prep visualize --dataset {{dataset}} {{args}}
 
 # --- Stage 2: training (cloud GPU) ---
 
@@ -62,32 +84,48 @@ edge:
 # One-time per machine: write the R2 endpoint (from Doppler) into gitignored .dvc/config.local.
 [group('dvc')]
 dvc-setup:
-    {{dop}} sh -c 'uvx dvc remote modify --local r2 endpointurl "$R2_ENDPOINT_URL"'
+    {{dop}} sh -c 'dvc remote modify --local r2 endpointurl "$R2_ENDPOINT_URL"'
 
 # Pull all data/model artifacts from the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 pull:
-    {{dop}} uvx --with dvc-s3 dvc pull
+    {{dop}} dvc pull
 
 # Pull roboflow download from the R2 remote.
 [group('dvc')]
 pull-rf:
-    {{dop}} uvx --with dvc-s3 dvc pull data/roboflow-export
+    {{dop}} dvc pull data/roboflow-export
 
 # Pull raw dataset from the R2 remote.
 [group('dvc')]
 pull-raw:
-    {{dop}} uvx --with dvc-s3 dvc pull data/raw
+    {{dop}} dvc pull data/raw
+
+# Pull one materialized split only: `just pull-split train|val|test|calib`.
+[group('dvc')]
+pull-split split:
+    {{dop}} dvc pull data/processed/{{split}}
+
+# Verify materialized splits match the manifest: just verify-splits [train|val|test|calib|all].
+[group('dvc')]
+verify-splits split="all":
+    uv sync --directory packages/common
+    uv run --directory packages/common verify-splits --split {{split}}
+
+# Track the materialized splits with DVC (run after `just data-prep`); commit the .dvc files.
+[group('dvc')]
+dvc-add-processed:
+    dvc add data/processed/train data/processed/val data/processed/test data/processed/calib
 
 # Push data/model artifacts to the R2 remote (R2 creds injected by Doppler).
 [group('dvc')]
 push:
-    {{dop}} uvx --with dvc-s3 dvc push
+    {{dop}} dvc push
 
 # Show DVC artifact status.
 [group('dvc')]
-dvc-status:
-    uvx dvc status
+ds:
+    dvc status
 
 # --- Secrets (Doppler) ---
 

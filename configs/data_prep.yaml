@@ -1,0 +1,13 @@
+# Data-prep stage config: near-dup grouping + split + INT8 calibration selection.
+# Loaded by `data-prep` (see packages/data_prep/src/qsd_data_prep/config.py).
+# Changing splits/threshold rewrites manifests/split_manifest.json — treat that as a
+# new dataset version (recommit manifest + re-`dvc add` data/processed).
+name: data-prep-v1
+seed: 42
+splits:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+phash_hash_size: 8 # 64-bit pHash
+phash_threshold: 8 # max Hamming distance for near-dup edges (derived via explore-thresholds)
+calib_size: 256 # INT8 calibration images drawn from train, <=1 per near-dup group
