@@ -72,6 +72,124 @@ To visualize any dataset split (images + ground-truth boxes) in the FiftyOne app
 
 </details>
 
+<details><summary>Algorithm deep-dive - <b>near-duplicate grouping</b> (why frames must stay together)</summary>
+
+**The problem.** The raw pool is dominated by video: long runs of near-identical frames.
+If two frames from the same clip land on opposite sides of a split, the model can *memorize*
+one and be tested on its twin — val/test scores go up without any real generalization. The
+only honest fix is to make sure near-duplicates never straddle a split. To do that we first
+have to *find* the near-duplicates, then treat each cluster as one indivisible unit.
+
+**Perceptual hashing.** Every image is reduced to a 64-bit perceptual hash with
+`imagehash.phash` (`phash_hash_size 8`). Unlike a cryptographic hash, a pHash changes
+*gradually* with the image: two frames that look alike produce hashes that differ in only a
+few bits. So "how similar are these two images?" becomes "how many bits differ between their
+hashes?" — the **Hamming distance**. We compute the full all-pairs distance matrix (N≈4656 is
+small enough to brute-force as an NxN `uint16` array, chunked to cap peak memory).
+
+**Clustering by connected components.** Any pair whose hashes differ by
+`<= phash_threshold` (8 bits) becomes an *edge*. We then run **union-find** over those edges:
+each connected component of the similarity graph becomes one **near-dup group**, and the
+splitter later assigns the whole group to a single split.
+
+**Why grouping is transitive — and why that's deliberate.** If frame A~B and B~C, all three
+land in one group *even when A and C differ by more than the threshold*. A slow pan across a
+clip drifts frame-to-frame, so the first and last frame can be far apart while every adjacent
+pair is close — chaining is exactly what keeps the entire clip together. Over-merging is the
+*conservative* direction: the worst case is a slightly smaller effective dataset, never
+leakage. The one failure mode — a threshold so loose it chain-merges a huge chunk of the pool
+into one mega-group — is caught downstream by the splitter's guardrail (see below).
+
+**Determinism.** Images are hashed in sorted id order, and group ids are re-numbered densely
+`0..G-1` by each group's smallest image id. No RNG anywhere, so the same pool always yields
+the same group ids — a prerequisite for the byte-stable committed manifest. The `8`-bit
+threshold itself was chosen once by eyeballing pair montages via `just explore-thresholds` and
+pinned in `configs/data_prep.yaml`.
+
+</details>
+
+<details><summary>Algorithm deep-dive - <b>group-aware stratified split assignment</b> (the core)</summary>
+
+**The tension.** Assigning *whole groups* to a split eliminates leakage by construction — but
+it fights class balance. A rare class clusters in only a handful of groups (boat has just 248
+annotations across the pool vs. person's 4292), so if you shuffle groups randomly, an entire
+class can end up absent from val or test. A class with zero test annotations is a class you
+*cannot measure*. So the splitter must satisfy four goals at once: **(1)** no group straddles
+splits, **(2)** every class appears in every split, **(3)** each split's per-class annotation
+share ≈ the target ratio (80/10/10), and **(4)** the result is deterministic.
+
+**The objective function.** We score a candidate arrangement by a **squared relative-deficit**
+cost. For each split *s* and class *c*, let the split's share of that class be
+`assigned_c,s / total_c` (the fraction of *all* class-*c* annotations that currently sit in
+*s*). The cost is the sum over all *(s, c)* of `(share − target_ratio_s)²`, plus a small
+image-count term (`IMAGE_TERM_WEIGHT = 0.25`) that scores overall image share the same way.
+
+The subtle, important part is *using each class's fraction of its own global total*. This
+auto-weights rare classes with no explicit weights: moving one boat annotation shifts boat's
+share by `1/248`, while moving one person annotation shifts person's share by only `1/4292` —
+roughly **17× less leverage**. The optimizer therefore spends its effort placing the scarce
+classes correctly first, exactly where imbalance does the most damage.
+
+**Greedy on the *delta*, not the absolute cost.** Groups are placed one at a time, each into
+the split that yields the smallest *change* in the objective (`cost_delta = after² − before²`
+per term). Comparing marginal deltas — not absolute deficits — is what makes the greedy sound.
+An absolute-cost greedy would see that train is "under target" on every class it hasn't filled
+yet and keep shoveling early groups into the small val/test splits to reduce those deficits,
+wrecking the ratios. The delta only asks "does adding *this* group here move us closer to
+balance than adding it elsewhere?"
+
+**Processing order — rarest-class-first.** Groups are sorted so those carrying the rarest
+present class go first (ties: most of that rare class, then most total annotations, then id);
+background-only groups come last. Scarce classes are placed *while every split still has room*,
+before the common classes fill the small splits and leave no slack.
+
+**The coverage pre-pass — why the objective alone isn't enough.** Even the *optimal*
+squared-deficit arrangement can legitimately starve a split of a class that lives in only two
+or three groups: the math may prefer piling all of them into train. So before the greedy runs,
+a seeding pass *guarantees* goal (2) directly — for each class (rarest first) and each split
+(smallest first), if that split has no annotation of the class yet, it places the eligible
+group that distorts balance least (fewest annotations of that class, then fewest total, then
+lowest id). This hands every class a foothold in every split; the greedy then optimizes ratios
+on top of that guarantee.
+
+**Background-only images.** Groups with no annotations contribute nothing to any class term,
+so their placement is driven *solely* by the small image-count term — which distributes them
+proportionally toward the target ratios rather than dumping them all in one split.
+
+**Guardrails (`_verify_splits`, fail-loud).** After assignment the result is asserted against
+all four goals: no group straddling splits (leakage); the biggest near-dup group under
+`MAX_GROUP_FRACTION` (25%) of the pool — a larger one means grouping chain-merged too much and
+the message says to lower `phash_threshold`; every class present in every split; and each
+split's image share within 5% of target. A failure stops the pipeline rather than silently
+shipping a bad split.
+
+**Determinism.** There is no RNG in the splitter at all — every choice is broken by sorted
+iteration and a fixed `SPLIT_ORDER` (train < val < test). (The config `seed` is a global
+pipeline seed; the split assignment itself doesn't consume it.) Same inputs ⇒ byte-identical
+manifest, which is why the manifest can be committed and diffed.
+
+</details>
+
+<details><summary>Algorithm deep-dive - <b>INT8 calibration set</b> (diverse, class-balanced)</summary>
+
+**Why a calibration set exists.** TensorRT's post-training INT8 quantization needs a small
+sample of real inputs to observe activation ranges and pick per-tensor scales. Two properties
+matter: the sample should be **diverse** (near-identical frames add no new information to the
+histograms) and it should **represent every class** (a class the calibrator never sees gets
+poorly-scaled activations). It is drawn only from **train** — never val/test — so quantization
+tuning can't peek at evaluation data.
+
+**How `select_calib` builds it.** First it picks one representative per near-dup train group —
+the most-annotated image (tie: lowest id) — which enforces "at most one per group" by
+construction and drops redundant frames. It then builds one candidate queue per class (rarest
+first, each queue ordered most-of-that-class first) plus a trailing background queue, and draws
+**round-robin, rarest class first**, taking one not-yet-picked representative from each queue
+per pass until it reaches `calib_size` (256) or runs out of eligible groups. Round-robin from
+rarest guarantees the scarce classes get pulled in early instead of being crowded out by common
+ones. Like the rest of the pipeline it is fully deterministic.
+
+</details>
+
 ## 2. Training
 Trains each model using frameworks and pipelines tuned to that model architecture. After training, exports each model to ONNX for compatibility with quantization. 
 
