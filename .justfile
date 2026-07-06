@@ -106,6 +106,12 @@ pull-raw:
 pull-split split:
     {{dop}} dvc pull data/processed/{{split}}
 
+# Verify materialized splits match the manifest: just verify-splits [train|val|test|calib|all].
+[group('dvc')]
+verify-splits split="all":
+    uv sync --directory packages/common
+    uv run --directory packages/common verify-splits --split {{split}}
+
 # Track the materialized splits with DVC (run after `just data-prep`); commit the .dvc files.
 [group('dvc')]
 dvc-add-processed:

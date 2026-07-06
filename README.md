@@ -52,8 +52,11 @@ The splits are DVC-tracked **per split** (`just dvc-add-processed && just push` 
 verifying), so later stages pull only what they need: `just pull-split val`,
 `just pull-split calib`. R2 stores image content once — DVC's cache is
 content-addressable, so `data/processed` copies dedup against `data/raw`. After pulling,
-a stage should call `qsd_common.verify_materialized("<split>")` to check the on-disk
-split matches the manifest before using it.
+run `just verify-splits <split>` (e.g. `just verify-splits val`, or no argument to check
+all of train/val/test/calib) to confirm the on-disk split matches the manifest before
+using it. This recipe validates the manifest, then checks each split's image file set
+and COCO JSON, failing loud on any mismatch. Stages can also call the underlying
+`qsd_common.verify_materialized("<split>")` directly.
 
 The pHash threshold was derived once by eyeballing pair montages from
 `just explore-thresholds -- --montages 8` and is pinned in

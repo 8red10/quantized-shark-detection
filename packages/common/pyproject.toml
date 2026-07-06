@@ -13,6 +13,9 @@ dependencies = [
     "httpx>=0.27",
 ]
 
+[project.scripts]
+verify-splits = "qsd_common.verify:main"
+
 [dependency-groups]
 dev = ["pytest>=8"]
 
