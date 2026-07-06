@@ -32,6 +32,43 @@ verifying, publish the pool with `dvc add data/raw && just push`; from then on
 
 </details>
 
+<details><summary>How <code>just data-prep</code> runs the pipeline over the <code>data/raw</code> pool</summary>
+
+1. **Near-dup grouping** — every image gets a 64-bit perceptual hash (`imagehash.phash`);
+   images within `phash_threshold` Hamming bits are linked, and connected components
+   become groups. Chaining is intentional: a whole video clip lands in one group even
+   when its first and last frames differ by more than the threshold.
+2. **Group-aware stratified split** — whole groups are assigned to train/val/test
+   (default 80/10/10, see `configs/data_prep.yaml`) by a deterministic greedy that
+   balances per-class **annotation** counts (a coverage pre-pass guarantees every class
+   appears in every split; background-only images are distributed proportionally).
+3. **INT8 calibration set** — `calib_size` (256) train images, at most one per near-dup
+   group, round-robin over classes rarest-first, for TensorRT PTQ on the Jetson.
+4. **Outputs** — `manifests/split_manifest.json` (committed; byte-identical across runs,
+   records phash/threshold/seed/ratios + per-image `group_id`/`split`/`is_calib`) and
+   `data/processed/{train,val,test,calib}/` (per-split images + COCO JSONs).
+
+The splits are DVC-tracked **per split** (`just dvc-add-processed && just push` after
+verifying), so later stages pull only what they need: `just pull-split val`,
+`just pull-split calib`. R2 stores image content once — DVC's cache is
+content-addressable, so `data/processed` copies dedup against `data/raw`. After pulling,
+a stage should call `qsd_common.verify_materialized("<split>")` to check the on-disk
+split matches the manifest before using it.
+
+The pHash threshold was derived once by eyeballing pair montages from
+`just explore-thresholds -- --montages 8` and is pinned in
+`configs/data_prep.yaml`.
+
+Changing the threshold or the split ratios rewrites the manifest and reshuffles
+assignments — treat that as a **new dataset version** (recommit the manifest, re-run
+`just dvc-add-processed`), not a tweak.
+
+To visualize any dataset split (images + ground-truth boxes) in the FiftyOne app, run
+`just visualize <dataset>` (e.g. `just visualize test`), which syncs the optional
+`fiftyone` group, pulls the artifact, and launches the app.
+
+</details>
+
 ## 2. Training
 Trains each model using frameworks and pipelines tuned to that model architecture. After training, exports each model to ONNX for compatibility with quantization. 
 
@@ -56,25 +93,26 @@ dependency on `packages/common`**. The repo root has *no* `[project]` table and 
 qsd/
 ├── pyproject.toml            # shared ruff/pytest config ONLY (not a package/workspace)
 ├── .gitignore
-├── .dvc/  .dvcignore         # data/models pulled from Cloudflare R2 via DVC
+├── .dvc/                     # data/models pulled from Cloudflare R2 via DVC
+├── .dvcignore                # enables consolidate-raw idempotency
 ├── README.md
 │
-├── data/                     # dvc-tracked (gitignored)
-├── models/                   # dvc-tracked — trained weights + ONNX exports
+├── data/                     # dvc-tracked - dataset
+├── models/                   # dvc-tracked - trained weights + ONNX exports
 ├── manifests/                # small split/calibration manifests (committed)
 ├── configs/                  # shared experiment configs (yaml)
 │
 └── packages/
     ├── common/               # shared library — qsd-common (imported, never run)
-    │   └── src/qsd_common/   #   io.py, config.py, utils.py, onnx.py
+    │   └── src/qsd_common/   #   io.py, config.py, manifest.py, utils.py, onnx.py, notify.py
     │
-    ├── data_prep/            # Stage 1 · qsd-data-prep   · own uv.lock · local CPU
+    ├── data_prep/            # Stage 1 · qsd-data-prep · own uv.lock · local CPU
     │   └── src/qsd_data_prep/
     │
     ├── training/             # Stage 2 · one independent project per framework
     │   ├── ultralytics/      #   qsd-train-ultralytics · own uv.lock · cloud GPU
-    │   ├── roboflow/         #   qsd-train-roboflow     · own uv.lock · cloud GPU
-    │   └── hf/               #   qsd-train-hf           · own uv.lock · cloud GPU
+    │   ├── roboflow/         #   qsd-train-roboflow    · own uv.lock · cloud GPU
+    │   └── hf/               #   qsd-train-hf          · own uv.lock · cloud GPU
     │       └── src/qsd_train_hf/
     │
     └── edge/                 # Stage 3 · qsd-edge · own uv.lock (glue only) · Jetson
@@ -87,17 +125,21 @@ qsd/
 # Setup
 
 Each machine clones the whole repo but only sets up its own stage. Common tasks are
-wrapped in a root [`justfile`](.justfile) — run `just` from the repo root to list them
+wrapped in a root [`.justfile`](.justfile) — run `just` from the repo root to list them
 (`just`, like `dvc`, must run from the repo root). Each recipe handles
 `uv sync → dvc pull → uv run` for its stage.
 
-```bash
-uv tool install rust-just     # provides `just` on the cloud GPU / Jetson (aarch64)
-just --list                   # discover recipes
+`just` and `dvc` are machine-level bootstrap tools (like `uv` itself) — install them once per
+machine as isolated `uv` tools so both resolve to a consistent command on `PATH` everywhere:
 
-just data-prep                # Stage 1 — local CPU
-just train ultralytics        # Stage 2 — cloud GPU (or: roboflow | hf)
-just edge-setup && just edge  # Stage 3 — Jetson: bootstrap venv once, then run
+```bash
+uv tool install rust-just       # provides `just` on the cloud GPU / Jetson (aarch64)
+uv tool install "dvc[s3]>=3,<4" # provides `dvc` on every machine (R2/S3 remote support)
+just --list                     # discover recipes
+
+just data-prep                  # Stage 1 — local CPU
+just train ultralytics          # Stage 2 — cloud GPU (or: roboflow | hf)
+just edge-setup && just edge    # Stage 3 — Jetson: bootstrap venv once, then run
 ```
 
 The Jetson's `edge-setup` recipe creates the venv with `--system-site-packages` so it can

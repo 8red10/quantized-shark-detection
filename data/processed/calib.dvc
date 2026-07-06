@@ -1,0 +1,6 @@
+outs:
+- md5: 40a60dc3353ec7f9e531fdeed639d608.dir
+  size: 118666095
+  nfiles: 256
+  hash: md5
+  path: calib
