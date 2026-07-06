@@ -133,9 +133,11 @@ def test_materialize_splits_builds_correct_tree(
     assert train_coco["categories"] == CATEGORIES
     assert train_coco["info"]["split"] == "train"
     assert train_coco["info"]["num_images"] == 3
+    assert "train split" in train_coco["info"]["description"]
 
     val_coco = json.loads((out / "val" / "annotations.coco.json").read_text())
     assert val_coco["annotations"] == []  # image 3 has no annotations
+    assert "val split" in val_coco["info"]["description"]
 
 
 def test_materialize_splits_deterministic_and_force(

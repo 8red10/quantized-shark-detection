@@ -152,6 +152,9 @@ def materialize_splits(
         split_anns.sort(key=lambda a: a["id"])
 
         info = dict(coco.get("info", {}))
+        info["description"] = (
+            f"SharkSpotting - {split} split materialized from the consolidated raw pool."
+        )
         info["split"] = split
         info["split_manifest_meta"] = manifest.meta
         info["num_images"] = len(split_images)
